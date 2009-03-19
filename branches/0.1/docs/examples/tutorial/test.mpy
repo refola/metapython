@@ -1,0 +1,20 @@
+'''Metapython test module'''
+?:
+    from namedtuple import namedtuple
+    def point(typename, ndim):
+        ndim = ndim.eval()
+        dimnames = [ 'x%d' % i for i in xrange(int(str(ndim))) ]
+        defcode result:
+            'This was generated using a nested macro'
+            ?namedtuple($str(typename)$, $','.join(dimnames)$)
+        return result
+
+?namedtuple(Foo, a, b, c)
+?point(Point4d, 2+2)
+
+def test_nested():
+    ?point(Point2d, 2)
+    print '?(2+2) => %r' % ?(2+2)
+    print '?{2+2} => %r' % ?{2+2}
+    print 'type(?{2+2}) => %r' % type(?{2+2})
+    return Point2d
