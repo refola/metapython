@@ -1,13 +1,418 @@
-#summary One-sentence summary of this page.
+#summary MetaPython Tutorial
 
 = Introduction =
 
-Add your content here.
+MetaPython provides a macro and code quoting facility for Python.  It
+accomplishes this via the use of an import hook.  
 
+This tutorial will describe the basic features of MetaPython and take you through
+the creation of a macro-based implementation of the `collections.namedtuple`
+class factory.
 
-= Details =
+= Installing MetaPython =
 
-Add your content here.  Format your content with:
-  * Text in *bold* or _italic_
-  * Headings, paragraphs, and lists
-  * Automatic links to other wiki pages
+{{{easy_install MetaPython}}}
+
+That's it.
+
+= MetaPython Basics =
+
+The main features of MetaPython are divided into import-time programming and code quoting.
+
+== Import Time Programming ==
+
+MetaPython introduces a concept called _import time_ to Python.  _import time_ is
+the time between which a module has been located and when the text of the module
+is handed over to Python to be interpreted.  In regular Python, nothing happens
+at import time.  
+
+MetaPython, however, provides import-time hooks to allow you to
+write code that changes the text of the module being imported before the regular
+Python interpreter ever sees it.  It accomplishes this via a small set of syntax
+extensions which currently (as of Python 2.6) generate syntax errors in regular
+Python.  (Each import-time construct begins with the question mark `?` which is
+not even recognized by Python as a valid Python token.)
+
+MetaPython accomplishes its import-time magic via the use of a PEP 302 import
+hook.  To use MetaPython, you don't really need to understand the details of
+import hooks.  Suffice it to say that before anything works, you need to execute
+
+{{{ import metapython; metapython.install_import_hook() }}}
+
+Once this is done, you will be able to import MetaPython files with the .mpy
+extension just as other Python files.
+
+== Code Quoting ==
+
+Being able to affect the text of a module is somewhat useful, but becomes much
+more useful when it's easy to _generate_ Python code to be inserted into the
+module.  This is provided by the code quoting facility of MetaPython.  MetaPython
+uses a new keyword `defcode` and the Jinja2 templating engine to expand blocks of
+templated Python code into metapython.Code objects which can be inserted into the
+text of a module at import-time.
+
+= Your First MetaPython Module =
+
+To begin, we will create a MetaPython module which provides the a macro-based
+implementation of the `collections.namedtuple` class factory.  Create a file
+"namedtuple.py" with the following text:
+
+{{{
+?:
+    def namedtuple(typename, *field_name_toks):
+        # Create and fill-in the class template
+        typename = str(typename)
+        field_names = tuple(repr(f) for f in field_name_toks)
+        numfields = len(field_names)
+        # tuple repr without parens or quotes
+        argtxt = repr(field_names).replace("'", "")[1:-1]   
+        reprtxt = ', '.join('%s=%%r' % name for name in field_names)
+        dicttxt = ', '.join('%r: t[%d]' % (name, pos)
+                            for pos, name in enumerate(field_names))
+        defcode result:
+            from operator import itemgetter
+            class $typename$(tuple):
+                '$typename$($argtxt$)'
+                __slots__ = ()
+                _fields = $field_names$
+
+                def __new__(cls, $argtxt$):
+                    return tuple.__new__(cls, $field_name_toks$)
+
+                @classmethod
+                def _make(cls, iterable, new=tuple.__new__, len=len):
+                    'Make a new $typename$ object from a sequence or iterable'
+                    result = new(cls, iterable)
+                    if len(result) != $numfields$:
+                        raise TypeError('Expected $numfields$ arguments, '
+                                        'got %d' % len(result))
+                    return result
+
+                def __repr__(self):
+                    return '$typename$($reprtxt$)' % self
+
+                def _asdict(t):
+                    'Return a new dict which maps field names to their values'
+                    return { $dicttxt$ }
+
+                def _replace(self, **kwds):
+                    '''Return a new %(typename)s object replacing specified
+                    fields with new values'''
+                    result = self._make(map(kwds.pop, $field_names$, self))
+                    if kwds:
+                        raise ValueError('Got unexpected field names: %r'
+                                         % kwds.keys())
+                    return result
+
+                def __getnewargs__(self):
+                    return tuple(self)
+                {% for i,name in enumerate(field_names) %}
+                $name$ = property(itemgetter($i$)){%endfor %}
+        return result
+}}}
+
+At this point, a bit of explanation is in order.  Namely, what is the meaning of
+`?:` and `defcode`?  And what about the $typename$ and {% for... %} stuff?
+
+`?:` introduces an import-time code block.  The code in the indented block
+following '?:' is executed at import time in the module's namespace.  This
+provides a way to define macros and functions to be used at import time.  (In
+MetaPython, macros are differentiated from functions by the way they are called,
+not the way they are defined.  Macro calls will be covered next.)
+
+`defcode` introduces a quoted code template.  Code templates are converted at
+import-time into calls to `metapython.expand_code_template(<str>, globals(),
+locals())` which in turn invokes the Jinja2 template engine on the code template
+in the context of the code block's definition.  (The Jinja2 syntax is covered at
+[http://jinja.pocoo.org/2/documentation/templates].)  The expanded code is then
+wrapped in a metapython.Code object and bound to the name in the `defcode` line.
+(In this case, the name is `result`.)
+
+MetaPython makes one change to the base syntax, that is, to use the dollar sign
+`$...$` as a variable delimiter rather than the double brace `{{...}}`.  This is
+done in order to prevent the Python and Jinja2 tokenizers from getting confused.
+
+So what we have in `namedtuple.mpy` is a MetaPython file which, at import time,
+defines a function/macro called `namedtuple` which will itself create a code
+block.  That's great and all, but how do we use it?
+
+= Calling Macros =
+
+MetaPython provides a facility for calling a function/macro at import time and
+inserting the result into the module's text at import time.  This is illustrated
+by the code below.  Save it in a file "test1.mpy":
+
+{{{
+?from namedtuple import namedtuple
+?namedtuple(Point, x, y)
+}}}
+
+OK, that was pretty short.  We have introduced two new constructs, however.  The
+first is the import-time import `?from...import`.  There's nothing special there
+- it's just an import that's performed at import time.  The syntax above is
+exactly equivalent to the following:
+
+{{{
+?:
+    from namedtuple import namedtuple
+}}}
+
+The next construct is the ?namedtuple(...) call.  This is a macro expansion.
+The function call namedtuple(...) is executed at import time and the results are
+inserted into the text of the module before it is passed on to the Python
+iterpreter.  In this case, we can see what the expansion is by importing the
+module and inspecting its __expanded__ attribute.  One thing to note is that
+before we do _anything_ with MetaPython, we must import it and enable its import hook:
+
+{{{
+>>> import metapython; metapython.install_import_hook()
+>>> import test1
+>>> print dir(test1)
+['Point', '__builtins__', '__doc__', '__expand_code_template', '__expanded__', '__name__', 'itemgetter']
+>>> print test1.__expanded__
+class Point (tuple ):
+                'Point(x, y)'
+                __slots__ =()
+                _fields =('x','y')
+
+                def __new__ (cls ,x ,y ):
+                    return tuple .__new__ (cls ,(x ,y ))
+
+                @classmethod 
+                def _make (cls ,iterable ,new =tuple .__new__ ,len =len ):
+                    'Make a new Point object from a sequence or iterable'
+                    result =new (cls ,iterable )
+                    if len (result )!=2 :
+                        raise TypeError ('Expected 2 arguments, '
+                        'got %d'%len (result ))
+                    return result 
+
+                def __repr__ (self ):
+                    return 'Point(x=%r, y=%r)'%self 
+
+                def _asdict (t ):
+                    'Return a new dict which maps field names to their values'
+                    return {'x':t [0 ],'y':t [1 ]}
+
+                def _replace (self ,**kwds ):
+                    '''Return a new %(typename)s object replacing specified
+                    fields with new values'''
+                    result =self ._make (map (kwds .pop ,('x','y'),self ))
+                    if kwds :
+                        raise ValueError ('Got unexpected field names: %r'
+                        %kwds .keys ())
+                    return result 
+
+                def __getnewargs__ (self ):
+                    return tuple (self )
+
+                x =property (itemgetter (0 ))
+                y =property (itemgetter (1 ))
+>>> p = test1.Point(1,2)
+>>> print p
+Point(x=1, y=2)
+>>> print p.__class__
+<class 'test1.Point'>
+}}}
+
+= Advanced Features =
+
+You can do even more with MetaPython, including nested and recursive macro
+calls.  For instance, say you wanted to have a macro that defined a point in N
+dimensions (not necessarily 2).  Create the following file and save it as test2.mpy:
+
+{{{
+?:
+    from namedtuple import namedtuple
+    def point(typename, ndim):
+        ndim = eval(str(ndim))
+        dimnames = [ 'x%d' % i for i in xrange(int(str(ndim))) ]
+        defcode result:
+            ?namedtuple($str(typename)$, $','.join(dimnames)$)
+        return result
+
+    def point_types(prefix, *ndims):
+        import metapython
+        result = metapython.Code()
+        for ndim in ndims:
+            ndim = int(ndim.eval()) # remember, ndim is a Code object
+            typename = '%s%dd' % (prefix, ndim)
+            result.extend(point(typename, ndim))
+        return result
+
+?point_types(Point, 2, 3, 4, 5)
+}}}
+
+Now, you can examine the 4 new classes created:
+
+{{{
+>>> import metapython; metapython.install_import_hook()
+>>> import test2
+>>> print dir(test2)
+['Point2d', 'Point3d', 'Point4d', 'Point5d', '__builtins__', '__doc__', '__expand_code_template', '__expanded__', '__name__', 'itemgetter', 'namedtuple', 'point', 'point_types']
+>>> print test2.__expanded__
+
+from operator import itemgetter 
+class Point2d (tuple ):
+                'Point2d(x0, x1)'
+                __slots__ =()
+                _fields =('x0','x1')
+
+                def __new__ (cls ,x0 ,x1 ):
+                    return tuple .__new__ (cls ,(x0 ,x1 ))
+
+                @classmethod 
+                def _make (cls ,iterable ,new =tuple .__new__ ,len =len ):
+                    'Make a new Point2d object from a sequence or iterable'
+                    result =new (cls ,iterable )
+                    if len (result )!=2 :
+                        raise TypeError ('Expected 2 arguments, '
+                        'got %d'%len (result ))
+                    return result 
+
+                def __repr__ (self ):
+                    return 'Point2d(x0=%r, x1=%r)'%self 
+
+                def _asdict (t ):
+                    'Return a new dict which maps field names to their values'
+                    return {'x0':t [0 ],'x1':t [1 ]}
+
+                def _replace (self ,**kwds ):
+                    '''Return a new %(typename)s object replacing specified
+                    fields with new values'''
+                    result =self ._make (map (kwds .pop ,('x0','x1'),self ))
+                    if kwds :
+                        raise ValueError ('Got unexpected field names: %r'
+                        %kwds .keys ())
+                    return result 
+
+                def __getnewargs__ (self ):
+                    return tuple (self )
+
+                x0 =property (itemgetter (0 ))
+                x1 =property (itemgetter (1 ))
+from operator import itemgetter 
+class Point3d (tuple ):
+                'Point3d(x0, x1, x2)'
+                __slots__ =()
+                _fields =('x0','x1','x2')
+
+                def __new__ (cls ,x0 ,x1 ,x2 ):
+                    return tuple .__new__ (cls ,(x0 ,x1 ,x2 ))
+
+                @classmethod 
+                def _make (cls ,iterable ,new =tuple .__new__ ,len =len ):
+                    'Make a new Point3d object from a sequence or iterable'
+                    result =new (cls ,iterable )
+                    if len (result )!=3 :
+                        raise TypeError ('Expected 3 arguments, '
+                        'got %d'%len (result ))
+                    return result 
+
+                def __repr__ (self ):
+                    return 'Point3d(x0=%r, x1=%r, x2=%r)'%self 
+
+                def _asdict (t ):
+                    'Return a new dict which maps field names to their values'
+                    return {'x0':t [0 ],'x1':t [1 ],'x2':t [2 ]}
+
+                def _replace (self ,**kwds ):
+                    '''Return a new %(typename)s object replacing specified
+                    fields with new values'''
+                    result =self ._make (map (kwds .pop ,('x0','x1','x2'),self ))
+                    if kwds :
+                        raise ValueError ('Got unexpected field names: %r'
+                        %kwds .keys ())
+                    return result 
+
+                def __getnewargs__ (self ):
+                    return tuple (self )
+
+                x0 =property (itemgetter (0 ))
+                x1 =property (itemgetter (1 ))
+                x2 =property (itemgetter (2 ))
+from operator import itemgetter 
+class Point4d (tuple ):
+                'Point4d(x0, x1, x2, x3)'
+                __slots__ =()
+                _fields =('x0','x1','x2','x3')
+
+                def __new__ (cls ,x0 ,x1 ,x2 ,x3 ):
+                    return tuple .__new__ (cls ,(x0 ,x1 ,x2 ,x3 ))
+
+                @classmethod 
+                def _make (cls ,iterable ,new =tuple .__new__ ,len =len ):
+                    'Make a new Point4d object from a sequence or iterable'
+                    result =new (cls ,iterable )
+                    if len (result )!=4 :
+                        raise TypeError ('Expected 4 arguments, '
+                        'got %d'%len (result ))
+                    return result 
+
+                def __repr__ (self ):
+                    return 'Point4d(x0=%r, x1=%r, x2=%r, x3=%r)'%self 
+
+                def _asdict (t ):
+                    'Return a new dict which maps field names to their values'
+                    return {'x0':t [0 ],'x1':t [1 ],'x2':t [2 ],'x3':t [3 ]}
+
+                def _replace (self ,**kwds ):
+                    '''Return a new %(typename)s object replacing specified
+                    fields with new values'''
+                    result =self ._make (map (kwds .pop ,('x0','x1','x2','x3'),self ))
+                    if kwds :
+                        raise ValueError ('Got unexpected field names: %r'
+                        %kwds .keys ())
+                    return result 
+
+                def __getnewargs__ (self ):
+                    return tuple (self )
+
+                x0 =property (itemgetter (0 ))
+                x1 =property (itemgetter (1 ))
+                x2 =property (itemgetter (2 ))
+                x3 =property (itemgetter (3 ))
+from operator import itemgetter 
+class Point5d (tuple ):
+                'Point5d(x0, x1, x2, x3, x4)'
+                __slots__ =()
+                _fields =('x0','x1','x2','x3','x4')
+
+                def __new__ (cls ,x0 ,x1 ,x2 ,x3 ,x4 ):
+                    return tuple .__new__ (cls ,(x0 ,x1 ,x2 ,x3 ,x4 ))
+
+                @classmethod 
+                def _make (cls ,iterable ,new =tuple .__new__ ,len =len ):
+                    'Make a new Point5d object from a sequence or iterable'
+                    result =new (cls ,iterable )
+                    if len (result )!=5 :
+                        raise TypeError ('Expected 5 arguments, '
+                        'got %d'%len (result ))
+                    return result 
+
+                def __repr__ (self ):
+                    return 'Point5d(x0=%r, x1=%r, x2=%r, x3=%r, x4=%r)'%self 
+
+                def _asdict (t ):
+                    'Return a new dict which maps field names to their values'
+                    return {'x0':t [0 ],'x1':t [1 ],'x2':t [2 ],'x3':t [3 ],'x4':t [4 ]}
+
+                def _replace (self ,**kwds ):
+                    '''Return a new %(typename)s object replacing specified
+                    fields with new values'''
+                    result =self ._make (map (kwds .pop ,('x0','x1','x2','x3','x4'),self ))
+                    if kwds :
+                        raise ValueError ('Got unexpected field names: %r'
+                        %kwds .keys ())
+                    return result 
+
+                def __getnewargs__ (self ):
+                    return tuple (self )
+
+                x0 =property (itemgetter (0 ))
+                x1 =property (itemgetter (1 ))
+                x2 =property (itemgetter (2 ))
+                x3 =property (itemgetter (3 ))
+                x4 =property (itemgetter (4 ))
+
+}}}
