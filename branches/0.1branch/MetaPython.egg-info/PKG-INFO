@@ -1,0 +1,25 @@
+Metadata-Version: 1.0
+Name: MetaPython
+Version: 0.1dev-r6
+Summary: Macro and code quoting facility for Python
+Home-page: http://code.google.com/p/metapython/
+Author: Rick Copeland
+Author-email: rick446@usa.net
+License: MIT
+Description: Basic macro and code quoting facility for Python.
+        Jinja2 is used to expand code templates, allowing full
+        access to the Python language for generating code.
+        
+        Metapython includes an import hook that recognizes
+        ".mpy" files as metapython files and performs macro
+        definition, expansion, and code instantiation at import-time.
+        
+Keywords: python,macro,code quoting,import hook
+Platform: UNKNOWN
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python
+Classifier: Topic :: Software Development :: Code Generators
+Classifier: Topic :: Software Development :: Interpreters
