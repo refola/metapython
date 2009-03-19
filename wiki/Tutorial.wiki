@@ -121,8 +121,9 @@ MetaPython, macros are differentiated from functions by the way they are called,
 not the way they are defined.  Macro calls will be covered next.)
 
 `defcode` introduces a quoted code template.  Code templates are converted at
-import-time into calls to {{{metapython.expand_code_template(<str>, globals(),
-locals())}}} which in turn invokes the Jinja2 template engine on the code template
+import-time into calls to 
+`metapython.expand_code_template(<str>, globals(),locals())` which in turn 
+invokes the Jinja2 template engine on the code template
 in the context of the code block's definition.  (The Jinja2 syntax is covered at
 [http://jinja.pocoo.org/2/documentation/templates].)  The expanded code is then
 wrapped in a metapython.Code object and bound to the name in the `defcode` line.
