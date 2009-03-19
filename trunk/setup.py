@@ -20,10 +20,10 @@ definition, expansion, and code instantiation at import-time.
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
-        'Operating System :: OS Independent'
-        'Programming Language :: Python'
-        'Topic :: Software Development :: Code Generators'
-        'Topic :: Software Development :: Interpreters'
+        'Operating System :: OS Independent',
+        'Programming Language :: Python',
+        'Topic :: Software Development :: Code Generators',
+        'Topic :: Software Development :: Interpreters',
         ], 
       keywords='python, macro, code quoting, import hook',
       author='Rick Copeland',
