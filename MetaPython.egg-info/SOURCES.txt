@@ -1,4 +1,3 @@
-setup.cfg
 setup.py
 MetaPython.egg-info/PKG-INFO
 MetaPython.egg-info/SOURCES.txt
