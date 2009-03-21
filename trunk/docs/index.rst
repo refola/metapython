@@ -19,6 +19,10 @@ Important Links
 `Downloads <http://code.google.com/p/metapython/downloads/list>`_
     For those who'd prefer not to use setuptools/easy_install.
 
+`MetaPython Discussion List <http://groups.google.com/group/metapython>`_
+    For discussion of all things MetaPython.  Feel free to post questions,
+    comments, or feature requests here.
+
 `MetaPython Tutorial <http://code.google.com/p/metapython/wiki/Tutorial>`_
     Provides a good starting point for learning MetaPython.  Following the
     tutorial you will learn how to use MetaPython to create a macro-ized version
