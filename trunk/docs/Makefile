@@ -29,6 +29,9 @@ help:
 clean:
 	-rm -rf _build/*
 
+upload: html
+	scp -r _build/html/* metapython.org:metapython.org
+
 html:
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) _build/html
 	@echo
