@@ -24,7 +24,7 @@ Important Links
     tutorial you will learn how to use MetaPython to create a macro-ized version
     of `collections.namedtuple` from the standard library.
 
-`Issue Tracker <http://code.google.com/p/metapython/issues/list/>`_
+`Issue Tracker <http://code.google.com/p/metapython/issues/list>`_
     Report any bugs or feature requests here.
 
 `MetaPython Announcement <http://blog.pythonisito.com/2009/03/announcing-metapython-macros-for-python.html>`_
