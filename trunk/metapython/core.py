@@ -1,15 +1,6 @@
-from __future__ import with_statement
 '''Metapython syntax extensions
-
-def ... macro:
-    this function should be called at import time, not at runtime, and the
-    AST should be modified with the results of the call inserted
-def ... code:
-    The following block is to be treated as a Jinja2 code template with variable
-    delimiters $ .. $
-def ():
-    (Anonymous function) -- Provide block-like support (with decorators)
 '''
+from __future__ import with_statement
 import os
 import new
 import sys
@@ -28,13 +19,17 @@ NESTING_OPS = {
 CLOSING_OPS = set(NESTING_OPS.values())
 
 def install_import_hook():
+    '''Installs the MetaImporter import hook along sys.meta_path'''
     if MetaImporter not in sys.meta_path:
         sys.meta_path.append(MetaImporter)
 
 class MetaImporter(object):
+    '''This is the class responsible for finding .mpy files to import'''
 
     @staticmethod
     def find_module(fullname, path=None):
+        '''This method locates an .mpy file along either
+        sys.path or the given path'''
         lastname = fullname.rsplit('.', 1)[-1]
         for d in (path or sys.path):
             mpy = os.path.join(d, lastname + '.mpy')
@@ -42,11 +37,13 @@ class MetaImporter(object):
                 return MetaLoader(mpy)
 
 class MetaLoader(object):
+    '''This is the class responsible for actually loading the .mpy files'''
 
     def __init__(self, path):
         self.path = path
 
     def load_module(self, name):
+        '''Load a .mpy file from the loader's given path'''
         mod = sys.modules.get(name)
         if mod is None:
             mod = import_file(self.path, name)
@@ -56,6 +53,7 @@ class MetaLoader(object):
         return mod
 
 def import_file(fn, name=None):
+    '''Import a .mpy file, creating a new module object'''
     if name is None:
         name = os.path.splitext(os.path.basename(fn))[0]
     result = new.module(name)
@@ -72,11 +70,13 @@ def import_file(fn, name=None):
         raise
 
 def expand_string(text):
+    '''Expand MetaPython text'''
     imp = ImportContext()
     doc, text = imp.expand(StringIO(text).readline)
     return imp, doc, text
 
 def expand_file(fn):
+    '''Expand a MetaPython file'''
     imp = ImportContext(fn)
     with open(fn) as fp:
         doc, text = imp.expand(fp.readline)
@@ -85,6 +85,8 @@ def expand_file(fn):
 
 
 class ImportContext(object):
+    '''Provides a context to import MetaPython (including local & global
+    dicts in which to exec the module code'''
 
     def __init__(self, filename = '<string>'):
         self.filename = filename
@@ -96,10 +98,12 @@ class ImportContext(object):
 
 
     def syntax_error(self, message, pos, line):
+        '''Helper to raise an appropriate syntax error'''
         raise SyntaxError(message,
                           (self.filename, pos[0], pos[1], line))
 
     def expand(self, readline):
+        '''Token-based macro and code quoting expander'''
         tokenstream = tokenize.generate_tokens(readline)
         tokenstream = _expand_quoted_code(tokenstream)
         tokenstream = self._expand_macros(tokenstream)
@@ -113,6 +117,8 @@ class ImportContext(object):
         return doc, text
 
     def _expand_macros(self, tokenstream):
+        '''Expand import-time macros in a token stream,
+        returning the expanded token stream.'''
         while True:
             t,v,b,e,l = tokenstream.next()
             if (t,v) == (token.ERRORTOKEN, '?'):
@@ -122,6 +128,7 @@ class ImportContext(object):
                 yield t,v,b,e,l
 
     def _expand_escape(self, escape_pos, tokenstream):
+        '''Expand a particular ? escape in a tokenstream'''
         t,v,b,e,l = tokenstream.next()
         if (t,v) == (token.OP, ':'):
             # import-time block
@@ -132,7 +139,8 @@ class ImportContext(object):
             expr = list(_read_nested(tokenstream, ')'))[:-1] # drop closing paren
             text = tokenize.untokenize(expr)
             expansion = str(eval(text, self.globals, self.locals))
-            for tok in self._expand_macros(tokenize.generate_tokens(StringIO(expansion).readline)):
+            for tok in self._expand_macros(
+                tokenize.generate_tokens(StringIO(expansion).readline)):
                 yield tok
         elif t == token.NAME:
             if v in ('import', 'from'):
@@ -157,12 +165,15 @@ class ImportContext(object):
                     yield tok
 
 def _read_eol(tokenstream):
+    '''Read tokens till the end of line'''
     t = None
     while t != token.NEWLINE:
         t,v,b,e,l = tokenstream.next()
         yield t,v,b,e,l
 
 def _read_expr(tokenstream, *expr_closing_ops):
+    '''Read an expression from a token stream.  The expression
+    ends when one of the expr_closing_ops operators is encountered.'''
     while True:
         t,v,b,e,l = tokenstream.next()
         yield t,v,b,e,l
@@ -182,6 +193,8 @@ def _read_expr(tokenstream, *expr_closing_ops):
             break
 
 def _expand_quoted_code(tokenstream):
+    '''Expand defcode and ${...} constructs in a tokenstream into
+    calls to expand_code_template'''
     while True:
         (t,v,b,e,l)  = tokenstream.next()
         if (t,v) == (token.NAME, 'defcode'):
@@ -205,19 +218,26 @@ def _expand_quoted_code(tokenstream):
             yield t,v,b,e,l
 
 def _expand_quoted_code_expr(tokenstream):
+    '''Expand ${...} constructs in a tokenstream into 
+    a call to expand_code_template'''
     tpl_text = tokenize.untokenize(tokenstream)
     new_text = '__expand_code_template(\n%r\n, globals(), locals())' % tpl_text
     for tok in tokenize.generate_tokens(StringIO(new_text).readline):
         yield tok
 
             
-def _read_macro_def(tokenstream):
-    for token in _read_nested(tokenstream, ':'):
-        yield token
-    for token in _read_block(tokenstream, keep_header=True):
-        yield token
-
 def _read_suite(tokenstream, keep_header=False, colon_already_read=False):
+    '''Read an indented suite of statements (or an inline suite) from a
+    tokenstream
+
+    :arguments:
+       tokenstream
+         the token stream
+       keep_header
+         whether to emit the header (text before the colon)
+       colon_already_read
+         if false, the suite will begin after the next colon
+    '''
     # read to the colon
     t=v=None
     if not colon_already_read:
@@ -237,6 +257,7 @@ def _read_suite(tokenstream, keep_header=False, colon_already_read=False):
             yield t,v,b,e,l
 
 def _read_block(tokenstream, keep_header=False):
+    '''Read an indented block'''
     # Read to the indent
     t=v=None
     while t != token.INDENT:
@@ -255,6 +276,8 @@ def _read_block(tokenstream, keep_header=False):
             yield t,v,b,e,l
 
 def _read_args(tokenstream):
+    '''Read an argument list: a list of expressions separated by commas and
+    terminated with a close-paren'''
     while True:
         toks = []
         for t,v,b,e,l in _read_nested(
@@ -264,6 +287,8 @@ def _read_args(tokenstream):
         if v == ')': break
 
 def _read_nested(tokenstream, *closing_ops):
+    '''Read a possibly nested expression.  The closing_ops are the operators
+    which can close the expression.'''
     closing_ops = set(closing_ops)
     while True:
         t,v,b,e,l = tokenstream.next()
@@ -276,15 +301,21 @@ def _read_nested(tokenstream, *closing_ops):
                     yield tok
 
 def pprint_toks(toks):
+    '''Print tokens with their symbolic names & values'''
     print pformat_toks(toks)
 
 def pformat_toks(toks):
+    '''Format tokens with their symbolic names & values'''
     l = []
     for t in toks:
         l.append('%s(%r)' % (token.tok_name[t[0]], t[1]))
     return '\n'.join(l)
 
 def expand_code_template(template_text, gbl, lcl):
+    '''Create a Jinja2 template from template_text and expand it
+    in a namespace created from the gbl and lcl dicts.  Any code objects in gbl
+    and lcl are converted to strings before expansion.
+    '''
     # Expand the tokens to their textual representation
     def _():
         for k,v in dict(gbl, **lcl).iteritems():
@@ -301,20 +332,26 @@ def expand_code_template(template_text, gbl, lcl):
     return Code(*tokens)
 
 class Code(object):
+    '''Code object for MetaPython.  (A Code object is really just a sequence of
+    tokens, but it's nice to have the class for isinstance() testing.)'''
 
     def __init__(self, *tokens):
         self.tokens = tokens
 
     def __repr__(self):
+        '''Return the Python text corresponding to this Code object'''
         return tokenize.untokenize(self.tokens).rstrip()
 
     def __iter__(self):
         return iter(self.tokens)
 
     def eval(self):
+        '''Force evaluation of a code expression'''
         return eval(repr(self))
 
     def extend(self, other):
+        '''Extend the current code object with a newline and the tokens
+        from the other sequence.'''
         self.tokens += (token.NEWLINE, '\n', (0,0), (0,0), None),
         self.tokens += tuple(other)
             
