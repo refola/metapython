@@ -9,7 +9,7 @@ Contents:
    Syntax Reference <syntax_reference>
 
 Important Links
----------------
+===============
 
 `MetaPython Tutorial <http://code.google.com/p/metapython/wiki/Tutorial>`_
     Provides a good starting point for learning MetaPython.  Following the
@@ -36,4 +36,4 @@ Modules
 .. toctree::
    :maxdepth: 2
 
-   modules/*
+   modules/core
