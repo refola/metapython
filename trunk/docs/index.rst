@@ -1,6 +1,8 @@
 MetaPython Documentation
 ========================
 
+.. image:: images/Ouroboros.png
+
 MetaPython provides a macro and code quoting facility for the Python programming
 language.  It accomplishes this via the use of an import hook.  MetaPython files
 are denoted with an `.mpy` extension and may contain quoted code blocks, macro
