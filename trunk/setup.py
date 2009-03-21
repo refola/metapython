@@ -28,7 +28,7 @@ definition, expansion, and code instantiation at import-time.
       keywords='python, macro, code quoting, import hook',
       author='Rick Copeland',
       author_email='rick446@usa.net',
-      url='http://code.google.com/p/metapython/',
+      url='http://metapython.org',
       license='MIT',
       packages=find_packages(exclude=['ez_setup', 'examples', 'tests']),
       include_package_data=True,
