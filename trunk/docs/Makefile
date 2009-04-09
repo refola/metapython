@@ -28,12 +28,21 @@ help:
 
 clean:
 	-rm -rf _build/*
+	-rm presentations/slides/intro.html
 
 upload: html
 	scp -r _build/html/* metapython.org:metapython.org
 
-html:
+presentations/slides/%.html: presentations/%.rst
+	tools/rst2s5.py $< $@
+
+slides: presentations/*.rst
+	-mkdir -p presentations/slides
+	$(MAKE) $(^:presentations/%.rst=presentations/slides/%.html)
+
+html: slides
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) _build/html
+	cp -r presentations/slides/ui _build/html/_downloads
 	@echo
 	@echo "Build finished. The HTML pages are in _build/html."
 
