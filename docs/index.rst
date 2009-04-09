@@ -14,6 +14,8 @@ Contents:
    :maxdepth: 2
 
    Syntax Reference <syntax_reference>
+   MetaPython Roadmap <roadmap>
+   Presentations <presentations>
 
 Important Links
 ===============
