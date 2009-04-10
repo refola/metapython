@@ -11,6 +11,8 @@ from itertools import chain
 
 from jinja2 import Template
 
+from parser import Code
+
 NESTING_OPS = {
     '(':')',
     '{':'}',
@@ -199,6 +201,8 @@ def _expand_quoted_code(tokenstream):
         (t,v,b,e,l)  = tokenstream.next()
         if (t,v) == (token.NAME, 'defcode'):
             varname = tokenstream.next()[1]
+            tpl_tokens = _read_block(tokenstream)
+            # Expand import-time constructs here
             tpl_text = tokenize.untokenize(_read_block(tokenstream))
             new_text = ('%s = __expand_code_template('
                         '%r, globals(),locals())\n'
@@ -331,27 +335,3 @@ def expand_code_template(template_text, gbl, lcl):
     tokens = list(tokenize.generate_tokens(StringIO(text.encode('utf-8')).readline))
     return Code(*tokens)
 
-class Code(object):
-    '''Code object for MetaPython.  (A Code object is really just a sequence of
-    tokens, but it's nice to have the class for isinstance() testing.)'''
-
-    def __init__(self, *tokens):
-        self.tokens = tokens
-
-    def __repr__(self):
-        '''Return the Python text corresponding to this Code object'''
-        return tokenize.untokenize(self.tokens).rstrip()
-
-    def __iter__(self):
-        return iter(self.tokens)
-
-    def eval(self):
-        '''Force evaluation of a code expression'''
-        return eval(repr(self))
-
-    def extend(self, other):
-        '''Extend the current code object with a newline and the tokens
-        from the other sequence.'''
-        self.tokens += (token.NEWLINE, '\n', (0,0), (0,0), None),
-        self.tokens += tuple(other)
-            

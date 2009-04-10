@@ -12,9 +12,12 @@ docs/Makefile
 docs/conf.py
 docs/index.rst
 docs/make.bat
+docs/syntax_reference.rst
 docs/examples/tutorial/namedtuple.mpy
 docs/examples/tutorial/test.mpy
 docs/examples/tutorial/test1.mpy
 docs/examples/tutorial/test2.mpy
+docs/images/Ouroboros.png
+docs/modules/core.rst
 metapython/__init__.py
 metapython/core.py
