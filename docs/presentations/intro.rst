@@ -2,7 +2,7 @@
  MetaPython
 ============
 
-.. image:: ../../../images/Ouroboros.png
+.. image:: ../_images/Ouroboros.png
    :height: 200
    :alt: Ouroboros
    :align: center
@@ -48,7 +48,7 @@ Inadequate Syntax in Your Language
 .. container::
    :class: incremental
 
-   .. figure:: ../../../images/already_got_one.jpg
+   .. figure:: ../_images/already_got_one.jpg
        :height: 150
        :alt: Already got one
        :align: center

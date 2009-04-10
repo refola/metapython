@@ -1,8 +1,8 @@
 Metadata-Version: 1.0
 Name: MetaPython
-Version: 0.1dev-r6
+Version: 0.1dev-r21
 Summary: Macro and code quoting facility for Python
-Home-page: http://code.google.com/p/metapython/
+Home-page: http://metapython.org
 Author: Rick Copeland
 Author-email: rick446@usa.net
 License: MIT

@@ -43,6 +43,7 @@ slides: presentations/*.rst
 html: slides
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) _build/html
 	cp -r presentations/slides/ui _build/html/_downloads
+	cp images/* _build/html/_images
 	@echo
 	@echo "Build finished. The HTML pages are in _build/html."
 
