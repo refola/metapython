@@ -1,3 +1,5 @@
+* Convert as_python() to str() everywhere for code conversion 
+
 * Use a stack for all code quoting
   * Quote simple statement
     * top.add('_mpy.top.add(parse("..."))')
