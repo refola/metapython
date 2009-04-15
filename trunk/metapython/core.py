@@ -11,7 +11,8 @@ from itertools import chain
 
 from jinja2 import Template
 
-from parser import Code
+# from parser import Code
+from metapython import parse
 
 NESTING_OPS = {
     '(':')',
@@ -63,9 +64,8 @@ def import_file(fn, name=None):
     try:
         imp, module_doc, module_text = expand_file(fn)
         result.__doc__ = module_doc
-        result.__dict__.update(imp.locals)
+        result.__dict__.update(imp.namespace)
         result.__expanded__ = module_text
-        exec module_text in result.__dict__
         return result
     except:
         del sys.modules[name]
@@ -80,8 +80,9 @@ def expand_string(text):
 def expand_file(fn):
     '''Expand a MetaPython file'''
     imp = ImportContext(fn)
-    with open(fn) as fp:
-        doc, text = imp.expand(fp.readline)
+    doc, text = imp.expand(fn)
+#     with open(fn) as fp:
+#         doc, text = imp.expand(fp.readline)
     return imp, doc, text
 
 
@@ -92,31 +93,32 @@ class ImportContext(object):
 
     def __init__(self, filename = '<string>'):
         self.filename = filename
-        self.globals = {
-            '__expand_code_template':expand_code_template }
-
-        self.locals = {
-            '__expand_code_template':expand_code_template }
-
+        self._mpy = parse.Builder()
+        self.namespace = dict(_mpy=self._mpy)
 
     def syntax_error(self, message, pos, line):
         '''Helper to raise an appropriate syntax error'''
         raise SyntaxError(message,
                           (self.filename, pos[0], pos[1], line))
 
-    def expand(self, readline):
+    def expand(self, fn):
         '''Token-based macro and code quoting expander'''
-        tokenstream = tokenize.generate_tokens(readline)
-        tokenstream = _expand_quoted_code(tokenstream)
-        tokenstream = self._expand_macros(tokenstream)
-        tokenstream = list(tokenstream)
-        t,v,b,e,l = tokenstream[0]
-        if t == token.STRING:
-            doc = v
+        inp = parse.parse_file(fn)
+        # Expand the defcode blocks
+        inp1 = inp.expand_defcode_blocks()
+        # Quote and exec to get the macros expanded
+        inp2 = inp1.quote()
+        self._mpy.push()
+        inp2.exec_(self.namespace, self.namespace)
+        inp3 = self._mpy.pop()
+        # Exec the module in the namespace
+        inp3.exec_(self.namespace, self.namespace)
+        first_token = iter(inp3).next()
+        if first_token.match(token.STRING):
+            doc = first_token.value
         else:
             doc = None
-        text = tokenize.untokenize(tokenstream)
-        return doc, text
+        return doc, inp3.as_python()
 
     def _expand_macros(self, tokenstream):
         '''Expand import-time macros in a token stream,
