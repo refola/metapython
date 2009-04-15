@@ -1,6 +1,7 @@
 import os
 import unittest
 
+import metapython
 from metapython import parse
 from metapython.parse import Builder
 
@@ -121,6 +122,19 @@ defcode result:
         expanded = _mpy.pop()
         print expanded.as_python()
         expanded.exec_(ns, ns)
+
+class TestImport(MetaPythonTest):
+
+    def setUp(self):
+        metapython.install_import_hook()
+
+    def testNamedTuple(self):
+        import namedtuple
+        result = namedtuple.namedtuple(
+            parse.parse_string('Point'),
+            parse.parse_string('x'),
+            parse.parse_string('y'))
+        print result.as_python()
 
 if __name__ == '__main__':
     unittest.main()
