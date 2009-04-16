@@ -113,10 +113,13 @@ class ImportContext(object):
         inp3 = self._mpy.pop()
         # Exec the module in the namespace
         inp3.exec_(self.namespace, self.namespace)
-        first_token = iter(inp3).next()
-        if first_token.match(token.STRING):
-            doc = first_token.value
-        else:
+        try:
+            first_token = iter(inp3).next()
+            if first_token.match(token.STRING):
+                doc = first_token.value
+            else:
+                doc = None
+        except StopIteration, si:
             doc = None
         return doc, inp3.as_python()
 

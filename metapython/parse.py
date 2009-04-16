@@ -32,6 +32,7 @@ class Builder(object):
         try:
             self.top.append(stmt, glbls, lcls)
         except NameError, ne:
+            print ne
             print 'Exception in %s' % stmt
             import pdb; pdb.set_trace()
             raise
@@ -51,8 +52,8 @@ class Builder(object):
         suite = Suite(new_header, self.pop())
         self.append(suite, glbls, lcls)
 
-    def q(self, code):
-        return parse_string(code)
+    def q(self, code, inline=True):
+        return parse_string(str(code), inline=inline)
 
 def string_from_tokens(toks, inline=False):
     def reindent():
@@ -72,12 +73,13 @@ def string_from_tokens(toks, inline=False):
                 indent.append(cur_indent)
                 yield tok
             elif tok.match(token.DEDENT):
-                indent.pop()
-                if tok.value != indent[-1]:
-                    tok = Token.make(
-                        tok.token, indent[-1],
-                        tok.begin, tok.end, tok.line)
-                yield tok
+                if len(indent) > 1:
+                    indent.pop()
+                    if tok.value != indent[-1]:
+                        tok = Token.make(
+                            tok.token, indent[-1],
+                            tok.begin, tok.end, tok.line)
+                    yield tok
             else:
                 yield tok
     toks = list(reindent())
@@ -106,22 +108,37 @@ def parse_file(fn, namespace=None):
                 yield tok
     return parse_stream(gen(), filename=fn)
 
-def parse_string(s, filename='<string>'):
-    return parse_stream(tokens_from_string(s), filename=filename)
+def parse_string(s, filename='<string>', inline=False):
+    return parse_stream(tokens_from_string(s), filename=filename, inline=inline)
 
-def expand_macros(tokenstream, filename='<string>', glbls=None, lcls=None):
+def expand_macros(tokenstream, glbls=None, lcls=None, filename=None):
     inp = iter(tokenstream)
     while True:
         t = inp.next()
         while t.match(token.ERRORTOKEN, '$'):
             expr_toks = list(_read_expr(inp))
             expr_toks, t = expr_toks[:-1], expr_toks[-1]
+            if t.match(token.OP, ':') and not expr_toks:
+                # Read a macro suite and execute it
+                t = inp.next()
+                if t.match(token.NEWLINE):
+                    suite = list(_read_indented_block(inp))
+                    prologue, suite, epilogue = \
+                        suite[0], suite[1:-1], suite[-1]
+                else:
+                    suite = [t] + list(_read_to_newline(inp))
+                exec string_from_tokens(suite) in glbls, lcls
+                t = inp.next()
+                continue
             if expr_toks[0].match(token.NAME, *KEYWORDS):
                 yield t
                 for tok in expr_toks:
                     yield tok
                 continue
-            expanded_expr_toks = expand_inline_codequotes(iter(expr_toks), filename)
+            expanded_expr_toks = expand_inline_codequotes(
+                iter(expr_toks), filename)
+            expanded_expr_toks = expand_macros(
+                expanded_expr_toks, glbls, lcls, filename)
             block = parse_stream(expanded_expr_toks, filename)
             result = block.eval(glbls, lcls)
             if hasattr(result, 'as_python'):
@@ -135,12 +152,12 @@ def expand_inline_codequotes(inp, filename):
         t = inp.next()
         if t.match(token.ERRORTOKEN, '?'):
             quoted_expr = _read_expr(inp)
-            text = '_mpy.parse_string(%r)' % quoted_expr.as_python()
+            text = '_mpy.parse_string(%r, inline=True)' % quoted_expr.as_python()
             for tt in parse_string(text, filename): yield tt
         else:
             yield t
 
-def parse_stream(tokenstream, filename='<string>'):
+def parse_stream(tokenstream, filename='<string>', inline=False):
     def gen():
         cur_line = []
         inp = iter(tokenstream)
@@ -179,7 +196,11 @@ def parse_stream(tokenstream, filename='<string>'):
                     cur_line = []
         except StopIteration:
             if cur_line: yield Stmt(cur_line)
-    return Block(list(gen()))
+    block = Block(list(gen()))
+    if inline:
+        assert len(block.statements) == 1, 'Illegal multiline short-quote (?)'
+        return block.statements[0]
+    return block
             
 class Stmt(object):
 
@@ -215,7 +236,7 @@ class Stmt(object):
                 if tok.match(token.ERRORTOKEN, '?'):
                     expr = list(_read_expr(inp))
                     expr_end = expr[-1]
-                    text = '_mpy.q(%r)' % string_from_tokens(expr[:-1],True)
+                    text = '_mpy.q(%r)' % string_from_tokens(expr[:-1])
                     for tok in parse_string(text):
                         yield tok
                     yield expr_end
@@ -289,7 +310,7 @@ class Suite(Stmt):
     def quote(self):
         if self.header[0].match(token.ERRORTOKEN, '$'):
             new_header = self.header[1:]
-            if len(new_header) == 1:
+            if new_header[0].match(token.OP, ':'):
                 return self.body
             else:
                 new_body = self.body.quote()
@@ -331,7 +352,7 @@ class Block(object):
 
     def as_python(self, inline=False):
         text = string_from_tokens(self, inline)
-        if not inline and text[-1] != '\n':
+        if not inline and not text or text[-1] != '\n':
             text += '\n'
         return text
 
@@ -389,15 +410,30 @@ class Block(object):
     def eval(self, glbls, lcls):
         try:
             return eval(self.as_python(True), glbls, lcls)
-        except TypeError, te:
+        except NameError, ne:
+            print self
+            print ne
             import pdb; pdb.set_trace()
             raise
+        except TypeError, te:
+            print te
+            import pdb; pdb.set_trace()
+            raise
+        except SyntaxError, se:
+            print se.text
+            print '-' * (se.offset-1) + '^'
+            print se
+            import pdb; pdb.set_trace()
+            raise
+            
 
     def exec_(self, glbls, lcls):
         text = self.as_python()
         try:
             exec text in glbls, lcls
         except SyntaxError, se:
+            print se.text
+            print '-' * (se.offset-1) + '^'
             print se
             import pdb; pdb.set_trace()
             raise
@@ -510,6 +546,8 @@ def _read_expr(tokenstream, *expr_closing_ops):
             break
         elif t.match(token.NAME):
             continue
+        elif t.match(token.NUMBER):
+            continue
         elif expr_closing_ops and t.match(token.OP, ',', ':'):
             continue
         else:
@@ -533,5 +571,7 @@ def _is_suite_header(cur_line):
             continue
         break
     if first_tok.match(token.NAME, *SUITE_HEADERS):
+        return True
+    elif first_tok.match(token.OP, ':'):
         return True
     return False

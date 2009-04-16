@@ -1,0 +1,6 @@
+def cif(cond, true_expr, false_expr = ?{pass}):
+    cond = eval(repr(cond))
+    if cond:
+        return true_expr
+    else:
+        return false_expr
