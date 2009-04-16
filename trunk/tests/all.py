@@ -108,7 +108,6 @@ defcode result:
             os.path.join(os.path.dirname(__file__),
                          'namedtuple.mpy'))
         inp1 = inp.expand_defcode_blocks()
-        print inp1.as_python()
         _mpy = Builder()
         ns = dict(_mpy=_mpy)
         inp1.exec_(ns, ns)
@@ -117,11 +116,11 @@ defcode result:
         inp4 = inp3.quote()
         inp4.namespace = ns
         _mpy.push()
-        print inp4.as_python()
         inp4.exec_(ns, ns)
         expanded = _mpy.pop()
-        print expanded.as_python()
         expanded.exec_(ns, ns)
+        self.assertEqual(str(ns['Point'](1,2)),
+                         'Point (x =1, y =2)')
 
 class TestImport(MetaPythonTest):
 
@@ -129,12 +128,13 @@ class TestImport(MetaPythonTest):
         metapython.install_import_hook()
 
     def testNamedTuple(self):
-        import namedtuple
-        result = namedtuple.namedtuple(
-            parse.parse_string('Point'),
-            parse.parse_string('x'),
-            parse.parse_string('y'))
-        print result.as_python()
+        import test1
+        p = test1.Point(1,2)
+        self.assertEqual(str(p), 'Point (x =1, y =2)')
+
+    def testNested(self):
+        import test2
+        print test2.__expanded__
 
 if __name__ == '__main__':
     unittest.main()

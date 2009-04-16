@@ -28,7 +28,7 @@ help:
 
 clean:
 	-rm -rf _build/*
-	-rm presentations/slides/intro.html
+	-rm -rf presentations/slides
 
 upload: html
 	scp -r _build/html/* metapython.org:metapython.org
