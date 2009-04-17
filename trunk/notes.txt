@@ -1,14 +1,5 @@
-* Convert as_python() to str() everywhere for code conversion 
+* Rebuild docs
+* Generate PyPI release
+* Upload new egg/tgz to Google Code
 
-* Use a stack for all code quoting
-  * Quote simple statement
-    * top.add('_mpy.top.add(parse("..."))')
-  * Quote suite (non-macro)
-    * top.add('_mpy.push()')
-    * for s in body: s.quote()
-    * top.add('_mpy.top.add(Suite(self.header, _mpy.pop())))
-  * Suite quoting (macro):
-    * push()
-    * for s in body: s.quote()
-    * top.add(Suite(self.header, pop()))
     
