@@ -134,7 +134,7 @@ class TestImport(MetaPythonTest):
 
     def testNested(self):
         import test2
-        print test2.__expanded__
+        # print test2.__expanded__
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,15 +1,13 @@
 from setuptools import setup, find_packages
 import sys, os
 
-version = '0.1'
+version = '0.2'
 
 setup(name='MetaPython',
       version=version,
       description="Macro and code quoting facility for Python",
       long_description="""\
 Basic macro and code quoting facility for Python.
-Jinja2 is used to expand code templates, allowing full
-access to the Python language for generating code.
 
 Metapython includes an import hook that recognizes
 ".mpy" files as metapython files and performs macro
@@ -34,7 +32,6 @@ definition, expansion, and code instantiation at import-time.
       include_package_data=True,
       zip_safe=True,
       install_requires=[
-        'jinja2 >= 2.1.1'
       ],
       entry_points="""
       # -*- Entry points: -*-

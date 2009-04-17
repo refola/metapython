@@ -5,15 +5,9 @@
 
 .. autofunction:: install_import_hook
 
-.. autofunction:: expand_code_template
-
 .. autofunction:: expand_file
 
 .. autofunction:: expand_string
-
-.. autofunction:: pformat_toks
-
-.. autofunction:: pprint_toks
 
 .. autoclass:: MetaImporter
    :show-inheritance:
@@ -33,10 +27,3 @@
    :inherited-members:
    :undoc-members:
 
-.. autoclass:: Code
-   :show-inheritance:
-   :members:
-   :inherited-members:
-   :undoc-members:
-
-   .. automethod:: __repr__

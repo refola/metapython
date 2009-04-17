@@ -53,3 +53,4 @@ Modules
    :maxdepth: 2
 
    modules/core
+   modules/parse
