@@ -1,0 +1,19 @@
+?:
+    from namedtuple import namedtuple
+    def point(typename, ndim):
+        ndim = eval(str(ndim))
+        dimnames = [ 'x%d' % i for i in xrange(int(str(ndim))) ]
+        defcode result:
+            ?namedtuple($str(typename)$, $','.join(dimnames)$)
+        return result
+
+    def point_types(prefix, *ndims):
+        import metapython
+        result = metapython.Code()
+        for ndim in ndims:
+            ndim = int(ndim.eval()) # remember, ndim is a Code object
+            typename = '%s%dd' % (prefix, ndim)
+            result.extend(point(typename, ndim))
+        return result
+
+?point_types(Point, 2, 3, 4, 5)
