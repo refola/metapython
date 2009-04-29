@@ -56,18 +56,18 @@ Code Quoting Escapes
 For a macro system to be useful, it should be simple to represent code to be
 generated.  To that end, MetaPython provides two mechanisms to quote Python code.
 
-`defcode <name>:`
+`defcode <name>(<name>,...):`
     This construct denotes the following suite as a code template.  Code
     templates can use the same import-time constructs mentioned above to control
     their expansion.  For instance, the following code::
 
-        defcode foo:
+        defcode foo():
             $for i in range(3):
                 print $i
 
     is equivalent to the following code::
 
-        defcode foo:
+        defcode foo():
             print 0
             print 1
             print 2
@@ -78,10 +78,29 @@ generated.  To that end, MetaPython provides two mechanisms to quote Python code
         for i in range(10):
             _mpy.append('print $i ', globals(), locals())
         foo = _mpy.pop()
+        foo = _mpy.sanitize(globals(), locals())
 
     (The `_mpy.append(...)` performs macro expansion in the context of 
     `globals()` and `locals()` dictionaries.)
 
+    One pitfall of macro expansion is that the `defcode` block you expand may use
+    variables that have the same names as the variables in the context into which
+    the macro is (eventually) expanded.  To sidestep this problem, code blocks are
+    /sanitized/, replacing some or all names used in the code block with names
+    that are guaranteed not to conflict with the context into which they are
+    expanded.  
+
+    If you *want* to capture some names in the context of the macro expansion,
+    you can still pass the names to be omitted as strings to the `sanitize()`
+    method.  If the name to be captured is dynamically determined, you can pass
+    a `$` - expression in place of a captured name.  For instance, if you wished
+    to create a macro that will create a new name, you could do the following::
+
+        def set(var, value):
+            defcode result($var):
+                $var = 
+
+        
 
 `?<...>` and `?...`
     This is the "short form" of code quoting.  The expression within the angle

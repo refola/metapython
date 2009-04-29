@@ -19,16 +19,34 @@ SUITE_HEADERS = set([
         'try', 'except', 'class', 'def',
         'defcode'])
 
+class GenSym(object):
+
+    def __init__(self):
+        self.count = 0
+
+    def __call__(self):
+        self.count += 1
+        return '_mpy_%d' % self.count
+
+gensym = GenSym()
+
 class Builder(object):
-    '''Helper class for building up blocks of code'''
+    '''Helper class for building up blocks of code.
+
+    A builder maintains a stack of Block objects called the statement stack.
+    This stack can be pushed & popped, and the top of the stack can have new
+    statements appended to it.
+    '''
     def __init__(self):
         self.stack = [ ]
 
     @property
     def top(self):
+        '''Return the top of the statement stack'''
         return self.stack[-1]
 
     def append(self, stmt, glbls, lcls):
+        '''Append a statement to the current top of the statement stack'''
         try:
             self.top.append(stmt, glbls, lcls)
         except NameError, ne:
@@ -38,12 +56,18 @@ class Builder(object):
             raise
 
     def push(self):
+        '''Push an empty block onto the statement stack.'''
         self.stack.append(Block())
 
     def pop(self):
+        '''Pop and return the block on top of the statement stack.'''
         return self.stack.pop()
 
     def append_suite(self, header, glbls, lcls):
+        '''Create a suite based on the header line given and the block on the top
+        of the stack (which will be popped and used as the body).  Then append
+        the newly created suite to the new top of the statement stack.
+        '''
         if isinstance(header, basestring):
             header = list(tokens_from_string(header))
         # print 'old header: %r' % string_from_tokens(header, True)
@@ -53,9 +77,15 @@ class Builder(object):
         self.append(suite, glbls, lcls)
 
     def q(self, code, inline=True):
+        '''Quote a code fragment and parse it.'''
         return parse_string(str(code), inline=inline)
 
 def string_from_tokens(toks, inline=False):
+    '''Build a string from a sequence of tokens.  This is a "better" version of
+    `tokenize.untokenize`, as it verifies that INDENT and DEDENT tokens are
+    appropriately converted to valid Python code (which tokenize.untokenize can
+    fail to do correctly.
+    '''
     def reindent():
         indent = ['']
         for tok in toks:
@@ -89,6 +119,7 @@ def string_from_tokens(toks, inline=False):
     return tokenize.untokenize(toks)
 
 def tokens_from_string(s):
+    '''Convert a string to a stream of tokens'''
     if not isinstance(s, basestring):
         import pdb; pdb.set_trace()
     readline = StringIO(s).readline
@@ -97,11 +128,13 @@ def tokens_from_string(s):
     return strm
 
 def tokens_from_file(fp):
+    '''Convert a file to a stream of tokens.'''
     strm = ( Token.make(*py_tok)
              for py_tok in tokenize.generate_tokens(fp.readline))
     return strm
 
 def parse_file(fn, namespace=None):
+    '''Convert a file to a Block of statements.'''
     def gen():
         with open(fn) as fp:
             for tok in tokens_from_file(fp):
@@ -109,9 +142,11 @@ def parse_file(fn, namespace=None):
     return parse_stream(gen(), filename=fn)
 
 def parse_string(s, filename='<string>', inline=False):
+    '''Convert a string to a Block of statements.'''
     return parse_stream(tokens_from_string(s), filename=filename, inline=inline)
 
 def expand_macros(tokenstream, glbls=None, lcls=None, filename=None):
+    '''Expand $-escapes in a token stream'''
     inp = iter(tokenstream)
     while True:
         t = inp.next()
@@ -147,17 +182,21 @@ def expand_macros(tokenstream, glbls=None, lcls=None, filename=None):
                 yield tok
         yield t
 
-def expand_inline_codequotes(inp, filename):
+def expand_inline_codequotes(inp, filename='<string>'):
+    '''Expand ?-escapes in a token stream'''
     while True:
         t = inp.next()
-        if t.match(token.ERRORTOKEN, '?'):
-            quoted_expr = _read_expr(inp)
-            text = '_mpy.parse_string(%r, inline=True)' % quoted_expr.as_python()
+        while t.match(token.ERRORTOKEN, '?'):
+            quoted_expr = list(_read_expr(inp))
+            quoted_expr, t = quoted_expr[:-1], quoted_expr[-1]
+            quoted_expr_str = string_from_tokens(quoted_expr)
+            text = ('_mpy.q(%r, inline=True)'
+                    % quoted_expr_str)
             for tt in parse_string(text, filename): yield tt
-        else:
-            yield t
+        yield t
 
 def parse_stream(tokenstream, filename='<string>', inline=False):
+    '''Convert a stream of tokens into a Block of statements.'''
     def gen():
         cur_line = []
         inp = iter(tokenstream)
@@ -165,7 +204,8 @@ def parse_stream(tokenstream, filename='<string>', inline=False):
             while True:
                 t = inp.next()
                 if (t.match(token.ERRORTOKEN, ' ')
-                    or t.match(token.ENDMARKER)):
+                    or t.match(token.ENDMARKER)
+                    or t.tok_name == 'NL'):
                     continue
                 cur_line.append(t)
                 if t.match(token.NEWLINE):
@@ -203,6 +243,7 @@ def parse_stream(tokenstream, filename='<string>', inline=False):
     return block
             
 class Stmt(object):
+    '''Base statement class'''
 
     def __init__(self, tokens):
         self.tokens = tokens
@@ -263,6 +304,7 @@ class Stmt(object):
         return list(self) == list(other)
 
 class Suite(Stmt):
+    '''A block-type statement, with a header and a body'''
 
     def __init__(self, header, body, prologue=None, epilogue=None):
         if prologue is None:
@@ -295,11 +337,25 @@ class Suite(Stmt):
     def expand_defcode_blocks(self):
         if self.first().match(token.NAME, 'defcode'):
             code_name = self.header[1].value
+            if self.header[2].match(token.OP, '('):
+                args = _read_args(iter(self.header[3:]))
+                args = (parse_stream(a).expand_defcode_blocks()
+                        for a in args)
+                args = (str(a).strip() for a in args)
+                args = (repr(a) for a in args)
+                omit_names = ','.join(args)
+            else:
+                import pdb; pdb.set_trace()
+                raise SyntaxError, 'Expected arglist'
             block = Block()
             block.append('_mpy.push()', {}, {})
             for stmt in self.body.statements:
                 block.append(stmt.quote(), {}, {})
             block.append('%s = _mpy.pop()' % code_name, {}, {})
+            block.append('%s = %s.sanitize(globals(), locals(), %s)' % (
+                    code_name,
+                    code_name,
+                    omit_names), {}, {})
             for stmt in block.statements:
                 yield stmt
         else:
@@ -331,10 +387,53 @@ class Suite(Stmt):
         self.epilogue.append(token)
         
 class Block(object):
+    '''A sequence of statements'''
 
     def __init__(self, statements=None):
         if statements is None: statements = []
         self.statements = statements
+
+    def sanitize(self, glbls, lcls, *omit_names):
+        '''Ask this block's builder to sanitize this block,
+        omitting the listed names'''
+        omit_names = [
+            str(eval(n, glbls, lcls)).strip()
+             for n in omit_names ]
+        myfun = Suite(
+            list(parse_string('def _():')),
+            self,
+            [ Token.make(token.INDENT, '    ', (0,0), (0,0), '') ],
+            [ Token.make(token.DEDENT, '    ', (0,0), (0,0), ''),
+              Token.make(token.NEWLINE, '\n', (0,0), (0,0), '\n')])
+        ns = {}
+        exec myfun.as_python() in ns
+        code = ns['_'].func_code
+        names = set(code.co_varnames)
+        for on in omit_names:
+            try:
+                names.remove(on)
+            except KeyError:
+                pass
+        newnames = dict((n, gensym()) for n in names)
+        result = self.replace_names(**newnames)
+#         print 'Santize result:'
+#         print self.as_python()
+#         print '==='
+#         print result.as_python()
+        return result
+
+    def replace_names(self, **newnames):
+        '''Replace the NAMEs in this block according to the newnames mapping.'''
+        def translate():
+            for tok in self:
+                if tok.match(token.NAME):
+                    yield tok.replace(
+                        value=newnames.get(tok.value, tok.value))
+                elif tok.match(token.ENDMARKER):
+                    continue
+                else:
+                    yield tok
+        return parse_stream(translate())
 
     def __iter__(self):
         for s in self.statements:
@@ -352,7 +451,7 @@ class Block(object):
 
     def as_python(self, inline=False):
         text = string_from_tokens(self, inline)
-        if not inline and not text or text[-1] != '\n':
+        if not inline and (not text or text[-1] != '\n'):
             text += '\n'
         return text
 
@@ -399,12 +498,15 @@ class Block(object):
             raise SyntaxError, 'Expected a single statement'
         return self.statements[0]
 
-    def expand(self):
+    def expand(self, glbls=None, lcls=None):
         quoted = self.quote()
-        _mpy = Builder()
-        ns = dict(_mpy=_mpy)
+        if glbls == lcls == None:
+            _mpy = Builder()
+            glbls = lcls = dict(_mpy=_mpy)
+        else:
+            _mpy = glbls.get('_mpy', lcls.get('_mpy'))
         _mpy.push()
-        quoted.exec_(ns, ns)
+        quoted.exec_(glbls, lcls)
         return _mpy.pop()
 
     def eval(self, glbls, lcls):
@@ -453,16 +555,28 @@ class Block(object):
 
 
 class Token(tuple):
+    '''Thin wrapper around tuple to allow access to the token.generate_tokens
+    results by name
+    '''
     __slots__ = ()
     token=property(itemgetter(0))
     value=property(itemgetter(1))
     begin=property(itemgetter(2))
     end=property(itemgetter(3))
     line=property(itemgetter(4))
+    field_names = (
+        'token', 'value', 'begin', 'end', 'line')
 
     @classmethod
     def make(klass, token, value, begin, end, line):
         return klass((token, value, begin, end, line))
+
+    def replace(self, **kwds):
+        result = self.make(*map(kwds.pop, self.field_names, self))
+        if kwds:
+            raise ValueError('Got unexpected field names: %r'
+                             % kwds.keys())
+        return result
 
     @property
     def tok_name(self):
@@ -502,6 +616,9 @@ class Token(tuple):
             return self
 
 def _read_indented_block(inp):
+    '''Generator that reads and yields tokens in an INDENT...DEDENT block.
+    Handles nested indents and yields the INDENT and the DEDENT tokens.
+    '''
     while True:
         tok = inp.next()
         yield tok
@@ -516,6 +633,9 @@ def _read_indented_block(inp):
             depth += 1
 
 def _read_to_newline(inp):
+    '''Generator that reads (and yields) tokens until a NEWLINE is encountered.
+    Yields the terminating NEWLINE.
+    '''
     while True:
         tok = inp.next()
         yield tok
@@ -526,7 +646,11 @@ def _read_expr(tokenstream, *expr_closing_ops):
     ends when one of the expr_closing_ops operators is encountered.'''
     first_token = None
     while True:
-        t = tokenstream.next()
+        try:
+            t = tokenstream.next()
+        except StopIteration:
+            yield Token.make(token.ENDMARKER, '', (0,0), (0,0), '')
+            break
         if first_token is None and t.match(token.OP, '<'):
             for tok in _read_nested(tokenstream, '>'):
                 if not tok.match(token.OP, '>'):
@@ -537,7 +661,7 @@ def _read_expr(tokenstream, *expr_closing_ops):
             break
         first_token = t
         yield t
-        if t.match(token.OP, expr_closing_ops):
+        if expr_closing_ops and t.match(token.OP, *expr_closing_ops):
             break
         elif t.match(token.OP, *NESTING_OPS.keys()):
             for tok in _read_nested(tokenstream, NESTING_OPS[t.value]):
@@ -553,6 +677,15 @@ def _read_expr(tokenstream, *expr_closing_ops):
         else:
             break
 
+def _read_args(tokenstream):
+    while True:
+        arg = list(_read_expr(tokenstream, ',', ')'))
+        if len(arg) == 1 and arg[0].match(token.ERRORTOKEN, '?'):
+            arg += list(_read_expr(tokenstream, ',', ')'))
+        if len(arg) > 1:
+            yield arg[:-1]
+        if arg[-1].match(token.OP, ')'): break
+
 def _read_nested(tokenstream, *closing_ops):
     '''Read a possibly nested expression.  The closing_ops are the operators
     which can close the expression.'''
@@ -566,6 +699,10 @@ def _read_nested(tokenstream, *closing_ops):
                 yield tok
 
 def _is_suite_header(cur_line):
+    '''Determine whether the given list of tokens constitutes a suite header.
+    Suite headers begin with one of the SUITE_HEADERS tokens and contain a
+    colon.  (Though I believe the check for a colon is superfluous.)
+    '''
     for first_tok in cur_line:
         if first_tok.token >= token.ERRORTOKEN:
             continue

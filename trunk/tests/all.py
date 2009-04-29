@@ -42,13 +42,14 @@ print 1
 print 2''')
 
     def testSimple(self):
-        inp = parse.parse_string('''defcode x:
+        inp = parse.parse_string('''defcode x():
     $for i in range(10):
         print "hi", $i''')
         golden1 = parse.parse_string('''_mpy.push()
 for i in range(10):
     _mpy.append('print "hi",$i ', globals(), locals())
 x = _mpy.pop()
+x = x.sanitize(globals(), locals(),)
 ''')
         golden2 = parse.parse_string('''print "hi", 0
 print "hi", 1
@@ -67,14 +68,14 @@ print "hi", 9''')
         self.assertEqualCode(ns['x'], golden2)
 
     def testQuoteBlock(self):
-        inp = parse.parse_string('''defcode x:
+        inp = parse.parse_string('''defcode x():
     for i in range(10):
         print i''')
         inp1 = inp.expand_defcode_blocks()
         ns = dict(_mpy=Builder())
         inp1.exec_(ns, ns)
-        self.assertEqualCode(ns['x'], '''for i in range(10):
-    print i''')
+        self.assertEqualCode(ns['x'], '''for _mpy_1 in range(10):
+    print _mpy_1''')
 
     def testShortQuote(self):
         inp = parse.parse_string('''foo(?pass)''')
@@ -94,7 +95,7 @@ $for i in range(10):
     def testDefcode(self):
         ns = dict(_mpy=Builder())
         inp = parse.parse_string('''j=50
-defcode result:
+defcode result():
     $for i in range(10):
         print $i, $j''')
         inp1 = inp.expand_defcode_blocks()
@@ -118,6 +119,7 @@ defcode result:
         _mpy.push()
         inp4.exec_(ns, ns)
         expanded = _mpy.pop()
+        print expanded
         expanded.exec_(ns, ns)
         self.assertEqual(str(ns['Point'](1,2)),
                          'Point (x =1, y =2)')
@@ -134,7 +136,65 @@ class TestImport(MetaPythonTest):
 
     def testNested(self):
         import test2
-        # print test2.__expanded__
+        self.assert_(test2.__expanded__)
+
+class TestHygene(MetaPythonTest):
+
+    def testReplaceName(self):
+        inp = parse.parse_string('j=50')
+        inp1 = inp.replace_names(j='foo')
+        self.assertEqualCode(inp1, 'foo=50')
+
+    def testSanitize(self):
+        inp = parse.parse_string('j=50')
+        inp1 = inp.sanitize({}, {})
+        self.assert_('j' not in str(inp1))
+        
+    def testSanitizePartial(self):
+        inp = parse.parse_string('j=i')
+        ns = dict(_mpy = Builder())
+        inp1 = inp.sanitize(ns, ns, '_mpy.q("i")')
+        self.assert_('j' not in str(inp1))
+        self.assert_('i' in str(inp1))
+
+    def testAutoSanitize(self):
+        inp = parse.parse_string('''
+defcode result(?i):
+    i = 'foo'
+    j = 'bar'
+''')
+        inp1 = inp.expand_defcode_blocks()
+        ns = dict(_mpy=Builder())
+        inp1.exec_(ns, ns)
+        result = str(ns['result'])
+        self.assert_('i' in result)
+        self.assert_('j' not in result)
+        inp = parse.parse_string('''
+defcode result():
+    i = 'foo'
+    j = 'bar'
+''')
+        inp1 = inp.expand_defcode_blocks()
+        ns = dict(_mpy=Builder())
+        inp1.exec_(ns, ns)
+        result = str(ns['result'])
+        self.assert_('i' not in result)
+        self.assert_('j' not in result)
+
+    def testSetMacro(self):
+        inp = parse.parse_string('''
+def set_(var, value):
+    defcode result(var):
+        $var = $value
+    return result
+''')
+        ns = dict(_mpy=Builder())
+        inp1 = inp.expand_defcode_blocks()
+        inp1.exec_(ns, ns)
+        inp2 = parse.parse_string('$set_(?A, 5)')
+        inp3 = inp2.expand(ns, ns)
+        self.assertEqualCode(inp3, 'A=5')
+        
 
 if __name__ == '__main__':
     unittest.main()

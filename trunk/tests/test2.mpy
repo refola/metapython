@@ -2,7 +2,7 @@ $:
     from namedtuple import namedtuple
     def point(typename, ndim):
         dimnames = [ 'x%d' % i for i in xrange(int(str(ndim))) ]
-        defcode result:
+        defcode result():
             $namedtuple(typename, *dimnames)
         return result
 
@@ -11,7 +11,7 @@ $:
             _mpy.q('%s%s' % (str(prefix).strip(), ndim))
             for ndim in ndims ]
         ndim_names = [ _mpy.q(n, True) for n in ndims ]
-        defcode result:
+        defcode result():
             $for name, ndim in zip(point_names, ndim_names):
                 $point(name, $ndim)
         return result

@@ -1,5 +1,0 @@
-* Rebuild docs
-* Generate PyPI release
-* Upload new egg/tgz to Google Code
-
-    
