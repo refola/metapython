@@ -8,7 +8,7 @@ def namedtuple(typename, *field_name_toks):
     reprtxt = ', '.join('%s=%%r' % name for name in field_names)
     dicttxt = ', '.join('%r: t[%d]' % (name, pos)
                         for pos, name in enumerate(field_names))
-    defcode result:
+    defcode result(typename):
         from operator import itemgetter
         class $<typename>(tuple):
             $("'%s(%s)'" % (typename, argtxt))
