@@ -91,16 +91,44 @@ generated.  To that end, MetaPython provides two mechanisms to quote Python code
     expanded.  
 
     If you *want* to capture some names in the context of the macro expansion,
-    you can still pass the names to be omitted as strings to the `sanitize()`
-    method.  If the name to be captured is dynamically determined, you can pass
-    a `$` - expression in place of a captured name.  For instance, if you wished
-    to create a macro that will create a new name, you could do the following::
+    you can still pass the names to be omitted to the `sanitize()`
+    method.  To pass a literal name, you can prefix the name with a `?` to
+    automatically quote it.  For instance, if you wished to write a macro that
+    will create a new (dynamically determined) name, you could do the following::
 
-        def set(var, value):
-            defcode result($var):
-                $var = 
+        def set_(var, value):
+            defcode result(var):
+                $var = $value
+            return result
 
-        
+    This expands to the following::
+
+        def set_ (var ,value ):
+            _mpy .push ()
+            _mpy .append ('$var =$value \n',globals (),locals ())
+            result =_mpy .pop ()
+            result =result .sanitize (globals (),locals (),'var')
+            return result 
+
+    Alternatively, if you wished to write a macro that will set the value of `i`
+    to a particular value, you would quote the `i` with a `?`::
+
+        def seti(value):
+            defcode result(?i):
+                i = $value
+            return result
+
+    This block then expands to::
+
+        def seti (value ):
+            _mpy .push ()
+            _mpy .append ('i =$value \n',globals (),locals ())
+            result =_mpy .pop ()
+            result =result .sanitize (globals (),locals (),"_mpy .q ('i ')")
+            return result 
+
+    (These examples are, of course, contrived, but they serve to illustrate the
+    hygenic macro features of MetaPython.)
 
 `?<...>` and `?...`
     This is the "short form" of code quoting.  The expression within the angle

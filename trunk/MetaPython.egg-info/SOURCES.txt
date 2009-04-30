@@ -1,4 +1,5 @@
 notes.txt
+release.bash
 setup.py
 MetaPython.egg-info/PKG-INFO
 MetaPython.egg-info/SOURCES.txt
