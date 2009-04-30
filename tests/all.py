@@ -119,7 +119,6 @@ defcode result():
         _mpy.push()
         inp4.exec_(ns, ns)
         expanded = _mpy.pop()
-        print expanded
         expanded.exec_(ns, ns)
         self.assertEqual(str(ns['Point'](1,2)),
                          'Point (x =1, y =2)')
@@ -194,6 +193,20 @@ def set_(var, value):
         inp2 = parse.parse_string('$set_(?A, 5)')
         inp3 = inp2.expand(ns, ns)
         self.assertEqualCode(inp3, 'A=5')
+
+    def testSetI(self):
+        inp = parse.parse_string('''
+def seti(value):
+    defcode result(?i):
+        i = $value
+    return result
+''')
+        ns = dict(_mpy=Builder())
+        inp1 = inp.expand_defcode_blocks()
+        inp1.exec_(ns, ns)
+        inp2 = parse.parse_string('$seti(5)')
+        inp3 = inp2.expand(ns, ns)
+        self.assertEqualCode(inp3, 'i=5')
         
 
 if __name__ == '__main__':
