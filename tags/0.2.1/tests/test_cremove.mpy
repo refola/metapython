@@ -1,0 +1,13 @@
+?:
+    DEBUG=False
+    
+import logging
+logging.basicConfig(level=logging.DEBUG)
+log = logging.getLogger(__name__)
+
+?from cremove import cif
+
+def do_test():
+    ?cif(DEBUG, log.debug('This statement will be logged'))
+
+

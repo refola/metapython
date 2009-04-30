@@ -1,0 +1,2 @@
+$from namedtuple import namedtuple
+$namedtuple(?Point, ?x, ?y)
