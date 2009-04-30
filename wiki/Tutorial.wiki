@@ -69,7 +69,7 @@ def namedtuple(typename, *field_name_toks):
     reprtxt = ', '.join('%s=%%r' % name for name in field_names)
     dicttxt = ', '.join('%r: t[%d]' % (name, pos)
                         for pos, name in enumerate(field_names))
-    defcode result:
+    defcode result(typename):
         from operator import itemgetter
         class $<typename>(tuple):
             $("'%s(%s)'" % (typename, argtxt))
@@ -144,13 +144,25 @@ when you are trying to construct part of an expression.
 import-time into calls to the MetaPython API which builds a data structure
 representing the code contained in the block.  Inside a `defcode` block, the
 import-time escape `$` allows you to "break out" of the quoting in order to
-modify the code returned.  Although the exact details of the MetaPython API are
+modify the code returned.  
+
+MetaPython's quoted code blocks are, by default, "hygenic".  This means that any
+variables used within a `defcode` block will not override variables in the
+context into which the code block is eventually expanded.  MetaPython
+accomplishes this by replacing any names created in a `defcode` block with new
+names with the `_mpy_` prefix Sometimes, however, you /want/ a new name
+introduced (as above, when you are defining a new class).  To prevent a name from
+being replaced by MetaPython's "sanitization", you specify the name as an
+argument to the defcode block.  In the case of `namedtuple`, we did this by
+passing `typename` as an argument.
+
+Although the exact details of the MetaPython API are
 beyond the scope of this tutorial, an example of the code that MetaPython
 constructs for a defcode block is instructive.  For instance, the following
 MetaPython code:
 
 {{{
-defcode x:
+defcode x():
     $for i in range(10):
         print "hi", $i
 }}}
@@ -162,6 +174,7 @@ _mpy.push()
 for i in range(10):
     _mpy.append('print "hi",$i ', globals(), locals())
 x = _mpy.pop()
+x = _mpy.sanitize(globals(), locals())
 }}}
 
 (_mpy is a MetaPython object used to construct code objects).
