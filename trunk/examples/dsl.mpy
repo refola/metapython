@@ -1,0 +1,21 @@
+def has_properties(*props):
+    str_props = (str(p) for p in props)
+    gen = ( (p,
+             '_' + p,
+             '_get_' + p,
+             '_set_' + p)
+            for p in str_props )
+    defcode result(*props):
+        $for pub, pri, getter, setter in gen:
+            def $<getter>(self):
+                return self.$pri
+            def $<setter>(self, value):
+                self.$pri =  value
+            $pub = property($getter, $setter)
+    return result
+
+def mixin(cls):
+    defcode result():
+        for name in dir($cls):
+            locals()[name] = getattr($cls, name)
+    return result

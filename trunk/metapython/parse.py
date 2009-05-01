@@ -396,9 +396,7 @@ class Block(object):
     def sanitize(self, glbls, lcls, *omit_names):
         '''Ask this block's builder to sanitize this block,
         omitting the listed names'''
-        omit_names = [
-            str(eval(n, glbls, lcls)).strip()
-             for n in omit_names ]
+        omit_names = list(eval_names(glbls, lcls, *omit_names))
         myfun = Suite(
             list(parse_string('def _():')),
             self,
@@ -680,8 +678,11 @@ def _read_expr(tokenstream, *expr_closing_ops):
 def _read_args(tokenstream):
     while True:
         arg = list(_read_expr(tokenstream, ',', ')'))
-        if len(arg) == 1 and arg[0].match(token.ERRORTOKEN, '?'):
-            arg += list(_read_expr(tokenstream, ',', ')'))
+        if len(arg) == 1:
+            if arg[0].match(token.ERRORTOKEN, '?'):
+                arg += list(_read_expr(tokenstream, ',', ')'))
+            elif arg[0].match(token.OP, '*'):
+                arg += list(_read_expr(tokenstream, ',', ')'))
         if len(arg) > 1:
             yield arg[:-1]
         if arg[-1].match(token.OP, ')'): break
@@ -712,3 +713,15 @@ def _is_suite_header(cur_line):
     elif first_tok.match(token.OP, ':'):
         return True
     return False
+
+def eval_names(glbls, lcls, *names):
+    '''Eval the given list of names in the given globals and locals.'''
+    for name in names:
+        if name.startswith('*'):
+            for n in eval(name[1:], glbls, lcls):
+                yield str(n).strip()
+        else:
+            yield str(eval(name, glbls, lcls)).strip()
+
+    
+    

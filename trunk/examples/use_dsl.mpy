@@ -1,0 +1,7 @@
+$from examples.dsl import has_properties, mixin
+
+class Foo(object):
+    $has_properties(?a, ?b, ?c, ?d)
+
+class Bar(object):
+    $mixin(?Foo)
