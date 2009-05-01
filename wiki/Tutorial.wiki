@@ -146,7 +146,7 @@ representing the code contained in the block.  Inside a `defcode` block, the
 import-time escape `$` allows you to "break out" of the quoting in order to
 modify the code returned.  
 
-MetaPython's quoted code blocks are, by default, "hygenic".  This means that any
+MetaPython's quoted code blocks are, by default, "hygienic".  This means that any
 variables used within a `defcode` block will not override variables in the
 context into which the code block is eventually expanded.  MetaPython
 accomplishes this by replacing any names created in a `defcode` block with new
