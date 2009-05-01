@@ -137,7 +137,16 @@ class TestImport(MetaPythonTest):
         import test2
         self.assert_(test2.__expanded__)
 
-class TestHygene(MetaPythonTest):
+    def test_dsl(self):
+        from examples.use_dsl import Foo
+        f = Foo()
+        f.a, f.b, f.c, f.d = 1,2,3,4
+        self.assertEqual((f._a, f._b, f._c, f._d),
+                         (1,2,3,4))
+        self.assertEqual((f.a, f.b, f.c, f.d),
+                         (1,2,3,4))
+        
+class TestHygiene(MetaPythonTest):
 
     def testReplaceName(self):
         inp = parse.parse_string('j=50')
@@ -207,7 +216,6 @@ def seti(value):
         inp2 = parse.parse_string('$seti(5)')
         inp3 = inp2.expand(ns, ns)
         self.assertEqualCode(inp3, 'i=5')
-        
 
 if __name__ == '__main__':
     unittest.main()

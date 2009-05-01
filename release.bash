@@ -14,4 +14,4 @@ popd &&
 pushd ../MetaPython-wiki &&
 svn ci -m "Release tutorial for version $VERSION" &&
 popd &&
-svn cp -m "Branch release $VERSION" . https://metapython.googlecode.com/svn/tags/$VERSION"
+svn cp -m "Branch release $VERSION" https://metapython.googlecode.com/svn/tags/$VERSION https://metapython.googlecode.com/svn/tags/$VERSION

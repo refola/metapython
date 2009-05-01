@@ -128,7 +128,7 @@ generated.  To that end, MetaPython provides two mechanisms to quote Python code
             return result 
 
     (These examples are, of course, contrived, but they serve to illustrate the
-    hygenic macro features of MetaPython.)
+    hygienic macro features of MetaPython.)
 
 `?<...>` and `?...`
     This is the "short form" of code quoting.  The expression within the angle
